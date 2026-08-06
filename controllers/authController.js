@@ -214,3 +214,65 @@ exports.googleAuth = async (req, res) => {
     res.status(500).json({ message: 'Google authentication failed', error: error.message });
   }
 };
+
+// GOOGLE SIGN-IN via access token controller — access_token Google ko bhej ke verify + userinfo leta hai
+exports.googleTokenAuth = async (req, res) => {
+  try {
+    const { access_token } = req.body; // sirf access_token accept karo, baaki client se trust nahi karna
+
+    if (!access_token) {
+      return res.status(400).json({ message: 'Access token is required' });
+    }
+
+    // Access token Google ko bhejo verify + userinfo fetch karne ke liye
+    const googleRes = await fetch(
+      `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${access_token}`
+    );
+
+    if (!googleRes.ok) {
+      return res.status(401).json({ message: 'Invalid or expired Google access token' });
+    }
+
+    const payload = await googleRes.json();
+    const { email, name, sub: googleId, picture } = payload; // ye ab Google-verified data hai
+
+    if (!email || !googleId) {
+      return res.status(400).json({ message: 'Google did not return required data' });
+    }
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      const randomPassword = crypto.randomBytes(32).toString('hex');
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(randomPassword, salt);
+
+      user = await User.create({
+        name,
+        email,
+        password: hashedPassword,
+        googleId,
+        avatar: picture,
+      });
+    } else {
+      if (!user.googleId) user.googleId = googleId;
+      if (picture && user.avatar !== picture) user.avatar = picture;
+      await user.save();
+    }
+
+    const token = generateToken(user._id);
+
+    res.status(200).json({
+      message: 'Google sign-in successful',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar || null,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Google authentication failed', error: error.message });
+  }
+};
