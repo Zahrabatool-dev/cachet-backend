@@ -17,11 +17,37 @@ connectDB();
 
 const app = express();
 
-app.use(cors());
+// Explicit list of allowed origins — production frontend + local dev
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://digital-locker-frontend.vercel.app',
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow requests with no origin (mobile apps, curl, Postman, server-to-server)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
+
 app.use(express.json());
 
 // Security headers set karta hai (XSS, clickjacking, etc. se basic protection)
-app.use(helmet());
+// crossOriginResourcePolicy aur crossOriginOpenerPolicy ko relax kiya taako
+// cross-origin frontend (Vercel) se backend (SnapDeploy) tak requests aur
+// Google Sign-In popup dono bina block hue kaam karein
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+  })
+);
+
 // MongoDB operator injection se bachata hai (jaise { "$gt": "" } wale malicious inputs)
 // Custom middleware kyunke express-mongo-sanitize Express 5 ke sath compatible nahi hai
 const sanitizeInput = (obj) => {
@@ -72,6 +98,3 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
    startExpiryCron();
 });
-
-
-  
