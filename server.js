@@ -18,6 +18,11 @@ connectDB();
 
 const app = express();
 
+// Vercel ke proxy ke peeche hosted hai, is liye ye zaroori hai warna
+// express-rate-limit 'X-Forwarded-For' header pe ValidationError throw
+// karta hai jo poore process ko crash kar deta hai
+app.set('trust proxy', 1);
+
 // Explicit list of allowed origins — production frontend + local dev
 const allowedOrigins = [
   'http://localhost:3000',
@@ -37,7 +42,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Preflight (OPTIONS) requests explicitly handle karo
+app.options(/.*/, cors(corsOptions)); // Preflight (OPTIONS) requests explicitly handle karo — Express 5 compatible wildcard
 
 app.use(express.json());
 
@@ -78,6 +83,8 @@ const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minute ka window
   max: 100, // is window mein max 100 requests per IP
   message: { message: 'Too many requests, please try again after 15 minutes' },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use(generalLimiter);
 
@@ -86,6 +93,8 @@ const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10, // 15 min mein sirf 10 login/signup attempts
   message: { message: 'Too many login attempts, please try again after 15 minutes' },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 app.use('/api/auth', authLimiter, authRoutes);
