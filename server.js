@@ -21,7 +21,7 @@ const app = express();
 // Explicit list of allowed origins — production frontend + local dev
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://digital-locker-frontend.vercel.app',
+  'https://cachet-frontend.vercel.app',
 ];
 
 app.use(cors({
